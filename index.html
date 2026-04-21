@@ -98,7 +98,12 @@ footer{text-align:center;padding:2rem;border-top:1px solid var(--border);font-si
       <h2>Get your free audit</h2>
       <p class="sub">Tell us about your business. We'll identify your biggest revenue leaks and send a personalised report.</p>
 
-      <form id="tradieForm" novalidate>
+      <form id="tradieForm" novalidate autocomplete="on">
+        <!-- honeypot: bots fill every input; humans never see this -->
+        <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none">
+          <label for="website_url">Website (leave empty)</label>
+          <input type="text" id="website_url" name="website_url" tabindex="-1" autocomplete="off">
+        </div>
         <div class="row2">
           <div>
             <label>First name</label>
@@ -210,24 +215,51 @@ document.getElementById('tradieForm').addEventListener('submit', async e => {
   const consentTerms = document.getElementById('consentTerms').checked;
   const consentMarketing = document.getElementById('consentMarketing').checked;
   const lastName = document.getElementById('lastName').value.trim();
+  const honeypot = document.getElementById('website_url').value;
+
+  // Bot trap: fake success, no DB write (don't signal detection)
+  if (honeypot) { console.log('[tradieForm] honeypot'); showSuccess(); return; }
 
   if (!firstName) return showErr('First name required.');
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showErr('Valid email required.');
   if (!consentTerms) return showErr('Please accept the terms to continue.');
 
+  // AU phone — accept 04xx, +614xx, (02) 9xxx, 02 9xxx, 1300/1800 — at least 8 digits after stripping
+  let phoneNormalized = null;
+  if (phone) {
+    const digits = phone.replace(/[^\d+]/g, '');
+    if (!/^(\+?61\d{8,9}|0\d{8,9}|1[38]00\d{6}|13\d{4})$/.test(digits)) {
+      return showErr('Please enter a valid Australian phone (e.g. 04xx xxx xxx or +61 4xx xxx xxx).');
+    }
+    phoneNormalized = digits.startsWith('+61') ? digits : (digits.startsWith('0') ? '+61' + digits.slice(1) : digits);
+  }
+
   const btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = 'Submitting…';
 
   const dedupeKey = btoa(email + '::' + utmCampaign).replace(/=/g,'').substring(0,64);
+  // Consent evidence (ACMA Spam Act) — captured even if phone/company empty
+  const consentEvidence = {
+    ts: new Date().toISOString(),
+    ua: navigator.userAgent,
+    lang: navigator.language,
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    referrer: document.referrer || null,
+    screen: { w: screen.width, h: screen.height },
+    consent_terms: consentTerms,
+    consent_marketing: consentMarketing,
+    version: 'v1.2026-04-21'
+  };
   const payload = {
     biz_key: 'TRADIE', campaign: utmCampaign, utm_campaign: utmCampaign,
     utm_source: utmSource, utm_medium: utmMedium,
     offer_code: 'TRADIE-AUDIT-FREE', source: 'tradie-ai-website', lead_type: 'free',
     full_name: (firstName + ' ' + lastName).trim(), name: (firstName + ' ' + lastName).trim(),
-    email, phone: phone || null, company: company || null,
+    email, phone: phoneNormalized, company: company || null,
     landing_page: window.location.href,
     consent_terms: consentTerms, consent_marketing: consentMarketing,
-    dedupe_key: dedupeKey, raw_payload: JSON.stringify({firstName, lastName, company})
+    dedupe_key: dedupeKey,
+    raw_payload: JSON.stringify({ firstName, lastName, company, phone_raw: phone || null, consent: consentEvidence })
   };
 
   // Attempt 1, then 1 retry on transient failure
