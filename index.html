@@ -164,6 +164,43 @@ const utmMedium = params.get('utm_medium') || 'web';
 
 document.getElementById('utmTrace').textContent = 'utm_campaign=' + utmCampaign + ' · biz_key=TRADIE · src=' + utmSource;
 
+// Global diagnostic trace (read in DevTools if form errors)
+window.__tradieFormDiag = { attempts: [], lastError: null };
+
+async function submitLead(payload, attempt) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const t0 = performance.now();
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/cap_leads', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON,
+        'Authorization': 'Bearer ' + SUPABASE_ANON,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    const ms = Math.round(performance.now() - t0);
+    let errBody = null;
+    if (!res.ok) errBody = await res.json().catch(() => ({}));
+    const trace = { attempt, status: res.status, ok: res.ok, ms, err: errBody };
+    window.__tradieFormDiag.attempts.push(trace);
+    console.log('[tradieForm]', trace);
+    return { res, errBody, ms };
+  } catch (netErr) {
+    clearTimeout(timeoutId);
+    const ms = Math.round(performance.now() - t0);
+    const trace = { attempt, network_error: netErr.name + ': ' + netErr.message, ms };
+    window.__tradieFormDiag.attempts.push(trace);
+    console.error('[tradieForm] network', trace);
+    throw netErr;
+  }
+}
+
 document.getElementById('tradieForm').addEventListener('submit', async e => {
   e.preventDefault();
   const firstName = document.getElementById('firstName').value.trim();
@@ -182,32 +219,60 @@ document.getElementById('tradieForm').addEventListener('submit', async e => {
   btn.disabled = true; btn.textContent = 'Submitting…';
 
   const dedupeKey = btoa(email + '::' + utmCampaign).replace(/=/g,'').substring(0,64);
+  const payload = {
+    biz_key: 'TRADIE', campaign: utmCampaign, utm_campaign: utmCampaign,
+    utm_source: utmSource, utm_medium: utmMedium,
+    offer_code: 'TRADIE-AUDIT-FREE', source: 'tradie-ai-website', lead_type: 'free',
+    full_name: (firstName + ' ' + lastName).trim(), name: (firstName + ' ' + lastName).trim(),
+    email, phone: phone || null, company: company || null,
+    landing_page: window.location.href,
+    consent_terms: consentTerms, consent_marketing: consentMarketing,
+    dedupe_key: dedupeKey, raw_payload: JSON.stringify({firstName, lastName, company})
+  };
 
-  try {
-    const res = await fetch(SUPABASE_URL + '/rest/v1/cap_leads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON, 'Prefer': 'return=representation' },
-      body: JSON.stringify({
-        biz_key: 'TRADIE', campaign: utmCampaign, utm_campaign: utmCampaign,
-        utm_source: utmSource, utm_medium: utmMedium,
-        offer_code: 'TRADIE-AUDIT-FREE', source: 'tradie-ai-website', lead_type: 'free',
-        full_name: (firstName + ' ' + lastName).trim(), name: (firstName + ' ' + lastName).trim(),
-        email, phone: phone || null, company: company || null,
-        landing_page: window.location.href,
-        consent_terms: consentTerms, consent_marketing: consentMarketing,
-        dedupe_key: dedupeKey, raw_payload: JSON.stringify({firstName, lastName, company})
-      })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(()=>({}));
-      if (res.status === 409 || err.code === '23505') { showSuccess(); return; }
-      throw new Error(err.message || 'HTTP ' + res.status);
+  // Attempt 1, then 1 retry on transient failure
+  let lastError = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const { res, errBody } = await submitLead(payload, attempt);
+      if (res.ok) { showSuccess(); return; }
+      // Dedupe = success from user's POV (unique_violation on email or dedupe_key)
+      if (res.status === 409 || (errBody && (errBody.code === '23505' || /duplicate/i.test(errBody.message || '')))) {
+        showSuccess(); return;
+      }
+      // Client error (4xx not 409/429) — don't retry, it's a payload issue
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+        lastError = { type: 'client', status: res.status, code: errBody && errBody.code, message: errBody && errBody.message };
+        break;
+      }
+      // 5xx / 429 → retry once
+      lastError = { type: 'server', status: res.status, message: errBody && errBody.message };
+    } catch (netErr) {
+      lastError = { type: 'network', message: netErr.name + ': ' + netErr.message };
+      // Network error → retry once
     }
-    showSuccess();
-  } catch(err) {
-    showErr('Something went wrong. Please try again or call us.');
-    btn.disabled = false; btn.textContent = 'Get my free audit →';
+    if (attempt === 1) await new Promise(r => setTimeout(r, 1500));
   }
+
+  // Both attempts failed — surface a useful message and log full diagnostic
+  window.__tradieFormDiag.lastError = lastError;
+  console.error('[tradieForm] FAILED', lastError, 'trace:', window.__tradieFormDiag.attempts);
+
+  // Beacon fallback — fire-and-forget so we still capture the lead server-side
+  // even if the main request couldn't complete (e.g. ad blocker closes the connection)
+  try {
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    navigator.sendBeacon && navigator.sendBeacon(
+      SUPABASE_URL + '/rest/v1/cap_leads?apikey=' + encodeURIComponent(SUPABASE_ANON),
+      blob
+    );
+  } catch(_) {}
+
+  const msg = lastError && lastError.type === 'network'
+    ? "Can't reach our servers — check your connection, disable ad-blockers for this page, or email troy@tech4humanity.com.au with your details."
+    : 'Submission failed (' + (lastError && (lastError.status || lastError.type)) + '). Please try again or email troy@tech4humanity.com.au.';
+  showErr(msg);
+  btn.disabled = false; btn.textContent = 'Get my free audit →';
 });
 
 function showErr(msg) {
