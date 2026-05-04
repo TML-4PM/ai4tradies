@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Products | AI 4 Tradies</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #111; color: #fff; }
+.nav { background: #0d0d0d; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: auto; }
+.nav a { color: #aaa; text-decoration: none; font-size: 14px; }
+.nav .brand { color: #fff; font-weight: bold; font-size: 18px; text-decoration: none; }
+.hero { padding: 80px 20px 40px; max-width: 1100px; margin: auto; }
+.hero h1 { font-size: 40px; margin-bottom: 16px; }
+.hero p { font-size: 18px; color: #aaa; max-width: 600px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; padding: 40px 20px 80px; max-width: 1100px; margin: auto; }
+.card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; transition: border-color 0.2s; }
+.card:hover { border-color: #555; }
+.card .tag { display: inline-block; font-size: 11px; font-weight: bold; letter-spacing: 1px; padding: 3px 10px; border-radius: 20px; margin-bottom: 20px; text-transform: uppercase; }
+.card h2 { font-size: 24px; margin-bottom: 12px; }
+.card p { font-size: 14px; color: #999; line-height: 1.7; flex-grow: 1; margin-bottom: 24px; }
+.card .price { font-size: 28px; font-weight: bold; margin-bottom: 20px; }
+.card .price span { font-size: 14px; color: #aaa; font-weight: normal; }
+.card a { display: block; text-align: center; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: bold; text-decoration: none; color: #fff; }
+.card .engine { font-size: 12px; color: #555; margin-top: 16px; }
+.loop-bar { background: #0d0d0d; padding: 20px; text-align: center; }
+.loop-bar .steps { display: inline-flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.loop-bar .step { font-size: 13px; font-weight: bold; color: #aaa; }
+.loop-bar .arrow { color: #444; }
+</style>
+</head>
+<body>
+
+<div style="background:#0d0d0d;">
+  <div class="nav">
+    <a class="brand" href="../index.html">AI 4 Tradies</a>
+    <a href="../index.html#audit">Free Audit →</a>
+  </div>
+</div>
+
+<div class="hero">
+  <h1>AI Agents for Tradies</h1>
+  <p>Three engines. One system. Built to capture every job, win every quote, and get you paid faster.</p>
+</div>
+
+<div class="grid">
+
+  <div class="card">
+    <div class="tag" style="background:#ff6b35">Loop Engine</div>
+    <h2>After-Hours Capture Agent</h2>
+    <p>Missed calls after 5pm cost you jobs. This agent sends an instant SMS, qualifies the lead, and schedules a callback — automatically, while you sleep.</p>
+    <div class="price">$49 <span>/month</span></div>
+    <a href="after-hours-capture-agent.html" style="background:#ff6b35">Learn More →</a>
+    <div class="engine">Runs on: Loop engine · SMS + WhatsApp + Web</div>
+  </div>
+
+  <div class="card">
+    <div class="tag" style="background:#00c896">Analyse + Write Engine</div>
+    <h2>Smart Intake Agent</h2>
+    <p>Handles every inbound enquiry across all channels. Reads it, scores it, drafts a reply, and fires a hot-lead alert when something high value comes in.</p>
+    <div class="price">$49 <span>/month</span></div>
+    <a href="smart-intake-agent.html" style="background:#00c896">Learn More →</a>
+    <div class="engine">Runs on: Analyse + Write engine · All channels</div>
+  </div>
+
+  <div class="card">
+    <div class="tag" style="background:#6c63ff">Write + Distribute Engine</div>
+    <h2>QuoteMate™</h2>
+    <p>Photo or voice description → professional quote → sent to customer in under 2 minutes. Auto follow-ups chase every open quote until it's won or dead.</p>
+    <div class="price">$49 <span>/month</span></div>
+    <a href="quotemate-agent.html" style="background:#6c63ff">Learn More →</a>
+    <div class="engine">Runs on: Write + Distribute engine · $49 / $149 / Custom</div>
+  </div>
+
+</div>
+
+<div class="loop-bar">
+  <div class="steps">
+    <div class="step">📊 ANALYSE</div>
+    <div class="arrow">→</div>
+    <div class="step">✍️ WRITE</div>
+    <div class="arrow">→</div>
+    <div class="step">📣 DISTRIBUTE</div>
+    <div class="arrow">→</div>
+    <div class="step">🔁 LOOP</div>
+  </div>
+</div>
+
+</body>
+</html>
